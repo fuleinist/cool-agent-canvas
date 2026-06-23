@@ -123,10 +123,10 @@ class InMemoryStore:
         """
         import queue as queue_mod
 
-        self._sub_counter += 1
-        sid = self._sub_counter
-        q: queue_mod.Queue[TraceEvent] = queue_mod.Queue(maxsize=1000)
         with self._lock:
+            self._sub_counter += 1
+            sid = self._sub_counter
+            q: queue_mod.Queue[TraceEvent] = queue_mod.Queue(maxsize=1000)
             self._subscribers[run_id].append((q, sid))
         return sid, q
 
