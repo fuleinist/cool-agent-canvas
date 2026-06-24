@@ -15,6 +15,7 @@ Three read paths:
 
 from __future__ import annotations
 
+import queue as _queue
 import threading
 from collections import defaultdict
 from typing import Iterator
@@ -53,19 +54,19 @@ class InMemoryStore:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._runs: dict[str, RunRecord] = {}
-        # subscriber queues: run_id -> list of (Queue, subscriber_id)
-        self._subscribers: dict[str, list[tuple]] = defaultdict(list)
+        # subscriber queues: run_id -> list of (threading.Queue, subscriber_id)
+        self._subscribers: dict[str, list[tuple[_queue.Queue, int]]] = defaultdict(list)
         self._sub_counter = 0
 
     # ---------- runs ----------
 
-    def create_run(self, name: str = "") -> RunRecord:
+    def create_run(self, name: str = "", run_id: str | None = None) -> RunRecord:
         import uuid
 
-        run_id = f"run_{uuid.uuid4().hex[:8]}"
+        rid = run_id or f"run_{uuid.uuid4().hex[:8]}"
         with self._lock:
-            rec = RunRecord(run_id=run_id, name=name)
-            self._runs[run_id] = rec
+            rec = RunRecord(run_id=rid, name=name)
+            self._runs[rid] = rec
             return rec
 
     def get_run(self, run_id: str) -> RunRecord | None:
@@ -80,12 +81,9 @@ class InMemoryStore:
 
     def append_event(self, run_id: str, event: TraceEvent) -> None:
         """Append an event to a run and fan it out to subscribers."""
-        import queue as queue_mod
-
         with self._lock:
             rec = self._runs.get(run_id)
             if rec is None:
-                # auto-create so adapter doesn't have to call create_run first
                 rec = RunRecord(run_id=run_id)
                 self._runs[run_id] = rec
             rec.events.append(event)
@@ -99,12 +97,10 @@ class InMemoryStore:
                 rec.status = "error"
             subs = list(self._subscribers.get(run_id, []))
 
-        # fan out outside the lock — never call user code while holding it
         for q, _sid in subs:
             try:
                 q.put_nowait(event)
-            except queue_mod.Full:
-                # drop on slow consumer; UI will catch up on reconnect
+            except _queue.Full:
                 pass
 
     def get_events(self, run_id: str) -> list[TraceEvent]:
@@ -116,17 +112,15 @@ class InMemoryStore:
 
     # ---------- subscriptions (live WS streaming) ----------
 
-    def subscribe(self, run_id: str) -> tuple[int, "queue.Queue[TraceEvent]"]:
+    def subscribe(self, run_id: str) -> tuple[int, _queue.Queue]:
         """Register a new subscriber for a run.
 
-        Returns (subscriber_id, queue) — caller must call unsubscribe().
+        Returns (subscriber_id, threading.Queue) — caller must call unsubscribe().
         """
-        import queue as queue_mod
-
+        self._sub_counter += 1
+        sid = self._sub_counter
+        q: _queue.Queue = _queue.Queue(maxsize=1000)
         with self._lock:
-            self._sub_counter += 1
-            sid = self._sub_counter
-            q: queue_mod.Queue[TraceEvent] = queue_mod.Queue(maxsize=1000)
             self._subscribers[run_id].append((q, sid))
         return sid, q
 
@@ -135,30 +129,11 @@ class InMemoryStore:
             subs = self._subscribers.get(run_id, [])
             self._subscribers[run_id] = [(q, s) for q, s in subs if s != sid]
 
-    def iter_live(self, run_id: str, sid: int) -> Iterator[TraceEvent]:
-        """Generator that yields events as they arrive for this subscriber.
-
-        Yields sentinel-like behaviour on unsubscribe by checking the queue
-        with a small timeout — caller should call .close() to stop.
-        """
-        import queue as queue_mod
-
-        _, q = self._subscribe_refs(run_id, sid)
-        while True:
-            try:
-                yield q.get(timeout=0.5)
-            except queue_mod.Empty:
-                # check whether we were unsubscribed
-                with self._lock:
-                    still = any(s == sid for _, s in self._subscribers.get(run_id, []))
-                if not still:
-                    return
-
-    def _subscribe_refs(self, run_id: str, sid: int) -> tuple[int, "queue.Queue[TraceEvent]"]:
+    def _subscribe_refs(self, run_id: str, sid: int) -> tuple[_queue.Queue, int]:
         with self._lock:
             for q, s in self._subscribers.get(run_id, []):
                 if s == sid:
-                    return sid, q
+                    return q, sid
         raise KeyError(f"subscriber {sid} not found for run {run_id}")
 
 
