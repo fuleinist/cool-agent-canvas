@@ -78,8 +78,8 @@
 #### Example
 - `examples/langgraph_basic/` — minimal LangGraph workflow (`planner → researcher → writer`) that the adapter wraps and emits traces for
 
-### v0.2 — Multi-framework (next cycles)
-- CrewAI adapter (crew + agent + task abstraction → TraceEvent)
+### v0.2 — Multi-framework (in progress)
+- ✅ CrewAI adapter (crew + agent + task abstraction → TraceEvent)
 - AutoGen adapter (GroupChat / ConversableAgent → TraceEvent)
 - SQLite-backed run persistence
 - Search/filter runs by name/tag/timestamp

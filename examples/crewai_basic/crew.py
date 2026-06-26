@@ -1,70 +1,46 @@
-"""Minimal CrewAI workflow: Researcher -> Writer.
+"""Minimal CrewAI workflow for testing the CrewAI adapter.
 
-Demonstrates the Agent Canvas CrewAI trace adapter with a 2-agent
-sequential crew that researches a topic and writes a summary.
+A research crew with two agents: a Researcher who gathers info and a Writer
+who produces the final report. Uses sequential process.
 """
 
-from __future__ import annotations
+from crewai import Agent, Crew, Process, Task
 
-from agent_canvas.crewai_adapter import trace_crewai
-from agent_canvas.storage import InMemoryStore
+researcher = Agent(
+    role="Researcher",
+    goal="Find and summarize information about {topic}",
+    backstory="You are an expert researcher who finds accurate information quickly.",
+    allow_delegation=False,
+    verbose=False,
+)
 
+writer = Agent(
+    role="Writer",
+    goal="Write a clear, concise report about {topic} based on research",
+    backstory="You are a technical writer who produces clear, well-structured reports.",
+    allow_delegation=False,
+    verbose=False,
+)
 
-def main() -> None:
-    import crewai
+research_task = Task(
+    description="Research {topic} and provide key findings, trends, and important facts.",
+    expected_output="A bullet-point summary of key findings about {topic}",
+    agent=researcher,
+)
 
-    researcher = crewai.Agent(
-        role="Researcher",
-        goal="Find information about the given topic",
-        backstory="You are a thorough researcher who finds relevant facts.",
-        allow_delegation=False,
-        verbose=False,
-    )
-    writer = crewai.Agent(
-        role="Writer",
-        goal="Write a clear summary based on research",
-        backstory="You are a concise writer who produces well-structured summaries.",
-        allow_delegation=False,
-        verbose=False,
-    )
+write_task = Task(
+    description="Write a concise report about {topic} based on the research findings.",
+    expected_output="A well-structured report about {topic} with introduction, key points, and conclusion",
+    agent=writer,
+)
 
-    research_task = crewai.Task(
-        name="research",
-        description="Research the topic: AI Agent Observability",
-        expected_output="A list of key facts and findings",
-        agent=researcher,
-    )
-    write_task = crewai.Task(
-        name="write",
-        description="Write a short report based on the research findings",
-        expected_output="A short report in markdown",
-        agent=writer,
-    )
+crew = Crew(
+    name="Research Crew",
+    agents=[researcher, writer],
+    tasks=[research_task, write_task],
+    process=Process.sequential,
+    verbose=False,
+)
 
-    crew = crewai.Crew(
-        agents=[researcher, writer],
-        tasks=[research_task, write_task],
-        verbose=False,
-    )
-
-    store = InMemoryStore()
-    events = list(trace_crewai(crew, run_name="crewai-demo", store=store))
-
-    print(f"Captured {len(events)} trace events:")
-    for ev in events:
-        print(f"  [{ev.type.value:12s}] node={ev.node or '-'}  {_summary(ev)}")
-
-
-def _summary(ev) -> str:
-    if ev.type.value == "run_start":
-        return ev.data.get("name", "")
-    if ev.type.value == "run_end":
-        return f"{ev.data.get('total_ms', 0):.0f}ms"
-    if ev.type.value == "state_delta":
-        d = ev.data.get("delta", {})
-        return f"agent={d.get('agent', '?')}  output={d.get('output', '')[:60]}"
-    return ""
-
-
-if __name__ == "__main__":
-    main()
+# Default input for standalone execution
+input = {"topic": "AI agents for software development"}
