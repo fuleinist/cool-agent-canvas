@@ -6,7 +6,9 @@
 
 **What it feels like:** Chrome DevTools Network tab meets TensorBoard, for agents. Dark IDE-native. The graph itself is the UI — you watch the trace paint itself as the workflow runs. Each node lights up when it executes; edges show message flow; tool calls expand inline. Time advances left-to-right.
 
-**v0.1 scope (this build):** LangGraph Python backend + FastAPI + WebSocket server + a single-file HTML/JS trace viewer. CrewAI / AutoGen adapters deferred to v0.2. React UI deferred to v0.3.
+**v0.1 scope (this build):** LangGraph Python backend + FastAPI + WebSocket server + a single-file HTML/JS trace viewer. React UI deferred to v0.3.
+
+**v0.2 (complete):** CrewAI adapter — `trace_crewai()` wraps a CrewAI `Crew` and emits `TraceEvent`s via `task_callback`. See `src/agent_canvas/crewai_adapter.py` and `examples/crewai_basic/`.
 
 ## 2. Design Language
 
@@ -76,8 +78,8 @@
 #### Example
 - `examples/langgraph_basic/` — minimal LangGraph workflow (`planner → researcher → writer`) that the adapter wraps and emits traces for
 
-### v0.2 — Multi-framework (next cycles)
-- CrewAI adapter (crew + agent + task abstraction → TraceEvent)
+### v0.2 — Multi-framework (in progress)
+- ✅ CrewAI adapter (crew + agent + task abstraction → TraceEvent)
 - AutoGen adapter (GroupChat / ConversableAgent → TraceEvent)
 - SQLite-backed run persistence
 - Search/filter runs by name/tag/timestamp

@@ -10,19 +10,21 @@ agent-canvas run examples/langgraph_basic/graph.py
 Watch your LangGraph / CrewAI / AutoGen workflow paint itself as it runs —
 every node, edge, message, and tool call streamed live to a browser UI.
 
-## Status: v0.1 (complete)
+## Status: v0.2 (complete)
 
 | Framework | Status |
 |-----------|--------|
 | LangGraph | ✅ v0.1 (complete) |
-| CrewAI    | 📋 v0.2 |
-| AutoGen   | 📋 v0.2 |
+| CrewAI    | ✅ v0.2 (complete) |
+| AutoGen   | 📋 v0.3 |
 
-See [SPEC.md](SPEC.md) for the full v0.1 design and acceptance criteria.
+See [SPEC.md](SPEC.md) for the full design and acceptance criteria.
 
-All 8 v0.1 acceptance criteria pass — 24 unit tests + end-to-end smoke test.
+All 29 tests pass — 24 v0.1 tests + 5 CrewAI adapter tests (including a real CrewAI integration test).
 
 ## Quickstart
+
+### LangGraph
 
 ```bash
 git clone https://github.com/fuleinist/cool-agent-canvas
@@ -30,6 +32,25 @@ cd cool-agent-canvas
 pip install -e .[langgraph,dev]
 agent-canvas run examples/langgraph_basic/graph.py
 # Browser opens to http://localhost:8765 with the live trace viewer
+```
+
+### CrewAI
+
+```bash
+pip install -e .[crewai,dev]
+python examples/crewai_basic/crew.py
+# Captures trace events from a 2-agent CrewAI workflow
+```
+
+Or use the adapter programmatically:
+
+```python
+from agent_canvas.crewai_adapter import trace_crewai
+from agent_canvas.storage import InMemoryStore
+
+crew = Crew(agents=[...], tasks=[...])
+store = InMemoryStore()
+events = list(trace_crewai(crew, run_name="my-crew", store=store))
 ```
 
 ## Why
